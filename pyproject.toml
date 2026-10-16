@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "studyflow-agent"
+version = "0.1.0"
+description = "An evaluable document-grounded RAG service"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.6",
+  "httpx>=0.27",
+  "python-dotenv>=1.0",
+  "python-multipart>=0.0.9",
+  "pypdf>=4.0",
+  "langchain-openai>=1.0,<2.0",
+]
+
+[project.optional-dependencies]
+reranker = ["onnxruntime>=1.20,<2", "tokenizers>=0.21,<1", "numpy>=1.26,<3"]
+ocr = ["rapidocr==3.9.2", "onnxruntime>=1.20,<2", "pypdfium2>=4.30,<6", "Pillow>=10,<13"]
+vector = ["qdrant-client>=1.19.1,<1.20"]
+agent = ["langgraph>=1.0", "langgraph-checkpoint-sqlite>=3.0"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+# 将本地工作台资源包含在安装包中，保证源码启动和 Docker 安装后均可访问。
+[tool.setuptools.package-data]
+app = ["static/*.html", "static/*.css", "static/*.js"]

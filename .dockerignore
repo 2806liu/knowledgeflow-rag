@@ -1,0 +1,10 @@
+# 构建上下文只允许服务必需文件，防止私有文档和配置进入镜像。
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!README.md
+!app/
+!app/**
+app/**/__pycache__/
+app/**/*.pyc

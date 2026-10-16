@@ -1,0 +1,31 @@
+# 默认无需密钥的文本/Mock 演示；LLM、OCR 和向量检索按配置显式启用。
+name: knowledgeflow-rag
+services:
+  api:
+    build: .
+    image: knowledgeflow-rag:local
+    ports:
+      - "127.0.0.1:${RAG_PORT:-8000}:8000"
+    env_file:
+      - path: .env.docker
+        required: false
+    environment:
+      STUDYFLOW_DATA_DIR: /data
+      STUDYFLOW_OCR_MODEL_DIR: /data/ocr_models
+      STUDYFLOW_RERANKER_MODEL_DIR: /data/reranker_models
+      STUDYFLOW_QDRANT_URL: http://qdrant:6333
+    volumes:
+      - rag_data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+  qdrant:
+    # 仅在需要向量检索时启用；版本固定，升级需重新验证。
+    image: qdrant/qdrant:v1.19.1
+    profiles: ["vector"]
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+volumes:
+  rag_data:
+  qdrant_data:

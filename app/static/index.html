@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>KnowledgeFlow · 文档知识工作台</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20261016history3">
+  <script src="/static/conversation.js?v=20261016history3" defer></script>
+  <script src="/static/upload_manager.js?v=20261016history3" defer></script>
+  <script src="/static/answer_policy.js?v=20261015enhanced1" defer></script>
+  <script src="/static/history.js?v=20261016history3" defer></script>
+  <script src="/static/app.js?v=20261016history3" defer></script>
+</head>
+<body>
+<!-- 图标由本地 SVG 提供，页面不访问外部 CDN 或第三方字体。 -->
+<svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/><path d="M8 10h8M8 14h5"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 10h18"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 5v15"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 .3l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7-.3l-3 3a5 5 0 0 0 7 7l2-2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-17-2 20"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6a8 8 0 0 1 13.2 3L20 12M4 12l.7 3A8 8 0 0 0 17.9 18"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/></symbol>
+</defs>
+</svg>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="KnowledgeFlow 首页"><span class="brand-mark">K<span>f</span></span><span class="brand-copy">KnowledgeFlow<small>文档知识工作台</small></span></a>
+    <div class="nav-caption">工作空间</div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-page="chat" aria-current="page"><svg><use href="#i-chat"/></svg><span>知识问答</span><span class="nav-dot"></span></button>
+      <button class="nav-item" data-page="documents"><svg><use href="#i-folder"/></svg><span>资料库</span><span id="nav-doc-count" class="nav-count">0</span></button>
+      <button class="nav-item" data-page="runs"><svg><use href="#i-clock"/></svg><span>运行记录</span></button>
+      <button id="history-toggle" class="nav-item history-toggle" type="button" aria-controls="history-panel" aria-expanded="false"><svg><use href="#i-chat"/></svg><span>历史会话</span></button>
+    </nav>
+    <!-- 会话列表只显示索引摘要；完整轮次由点击后分页读取。 -->
+    <section id="history-panel" class="history-panel" aria-label="历史会话">
+      <div class="history-heading"><strong>历史会话</strong><button id="history-close" type="button" class="history-close" aria-label="关闭历史会话">×</button></div>
+      <button id="sidebar-new-chat" class="sidebar-new-chat" type="button"><svg><use href="#i-plus"/></svg>新建会话</button>
+      <label class="sr-only" for="history-search">搜索会话标题</label><input id="history-search" type="search" placeholder="搜索会话标题" maxlength="100">
+      <div class="history-filters"><button type="button" data-history-filter="active" class="selected">最近</button><button type="button" data-history-filter="archived">已归档</button></div>
+      <div id="history-list" class="history-list" aria-live="polite"></div>
+      <button id="history-more" class="history-more" type="button" hidden>加载更多</button>
+    </section>
+    <div class="sidebar-footer"><a href="/docs" target="_blank" rel="noopener"><svg><use href="#i-code"/></svg>开发者 API 文档<svg class="external-arrow"><use href="#i-arrow"/></svg></a><div class="service-status"><i id="health-dot"></i><span id="health-text">正在连接服务</span></div></div>
+  </aside>
+  <button id="history-backdrop" class="history-backdrop" type="button" aria-label="关闭历史会话" hidden></button>
+  <main class="workspace">
+    <header class="topbar"><div><span class="breadcrumb">工作空间</span><span class="slash">/</span><span id="breadcrumb-current">知识问答</span></div><div class="topbar-right"><span class="private-mark"><svg><use href="#i-check"/></svg>本地工作空间</span><span class="avatar" aria-hidden="true">K</span></div></header>
+    <section id="page-chat" class="page active" aria-labelledby="chat-title">
+      <div class="page-heading"><div><p class="eyebrow">YOUR KNOWLEDGE, CONNECTED</p><h1 id="chat-title">向你的资料提问<span class="heading-dot">.</span></h1><p class="subtitle">找到相关证据，让每个回答都可以回到原文。</p></div><button id="new-chat" class="button secondary"><svg><use href="#i-plus"/></svg>新建会话</button></div>
+      <div class="metrics"><div class="metric"><span class="metric-icon"><svg><use href="#i-folder"/></svg></span><div><span class="metric-label">知识来源</span><strong id="stat-docs">0<small>份文档</small></strong></div></div><div class="metric"><span class="metric-icon"><svg><use href="#i-file"/></svg></span><div><span class="metric-label">可检索片段</span><strong id="stat-chunks">0<small>个片段</small></strong></div></div><div class="metric"><span class="metric-icon"><svg><use href="#i-spark"/></svg></span><div><span class="metric-label">回答模式</span><strong id="stat-mode" class="mode-value">正在读取</strong></div><span class="metric-live">LIVE</span></div></div>
+      <div class="chat-grid">
+        <section class="chat-panel panel" aria-label="问答区">
+          <!-- 资料和上传任务集中在顶部弹层，避免列表常驻输入框上方挤压对话。 -->
+          <div class="panel-top"><div class="panel-title"><svg><use href="#i-chat"/></svg>知识问答</div><div class="chat-controls"><label class="answer-policy-control">回答策略<select id="answer-policy" aria-label="回答策略"><option value="document_enhanced">文档增强</option><option value="document_strict">仅依据文档</option></select></label><button id="scope-button" class="scope-button"><span class="tiny-dot"></span><span id="scope-label">全部资料</span><span class="chevron">⌄</span></button><details id="materials-menu" class="materials-menu"><summary><svg><use href="#i-folder"/></svg>资料 <span id="materials-count" class="count-badge">0</span><span id="upload-count" class="upload-count" hidden></span></summary><div class="materials-popover"><div class="materials-section-title">本会话资料</div><section id="session-attachments" class="session-attachments" aria-label="本会话资料"></section><div id="upload-section" hidden><div class="materials-section-title">上传任务</div><section id="upload-tasks" class="upload-tasks" aria-label="附件处理状态" aria-live="polite"></section></div></div></details></div></div>
+          <div id="conversation" class="conversation" aria-live="polite">
+            <button id="turns-more" class="turns-more" type="button" hidden>加载更早消息</button>
+            <div id="welcome" class="welcome"><div class="welcome-art"><svg class="art-file"><use href="#i-file"/></svg><span class="art-connector"></span><svg class="art-chat"><use href="#i-chat"/></svg><span class="art-spark">✦</span></div><h2>你的资料，准备好开口了</h2><p id="welcome-description">上传一份资料，开始第一次有依据的对话。</p><button id="welcome-upload" class="button primary"><svg><use href="#i-upload"/></svg>上传第一份资料</button><div class="suggestion-label">也可以这样问</div><div class="suggestions"><button data-question="这份资料的核心要点是什么？">这份资料的核心要点是什么？<span>↗</span></button><button data-question="资料中有哪些提交要求？">资料中有哪些提交要求？<span>↗</span></button><button data-question="列出文档中给出的关键步骤。">列出文档中给出的关键步骤<span>↗</span></button></div></div>
+          </div>
+          <form id="chat-form" class="composer"><div id="archive-notice" class="archive-notice" hidden>此会话已归档。请在左侧点击“恢复”后继续提问。</div><div class="composer-field"><label for="question" class="sr-only">输入你的问题</label><textarea id="question" rows="2" maxlength="12000" placeholder="提个问题，比如：课程报告的命名格式是什么？"></textarea><div class="composer-bottom"><button type="button" id="composer-upload" class="text-button"><svg><use href="#i-plus"/></svg>添加资料</button><span id="composer-status">Enter 发送 · Shift + Enter 换行</span><button id="send-button" class="send-button" type="submit" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div><p class="composer-note">回答由模型生成，请结合引用原文核对。</p></form>
+        </section>
+        <aside id="sources-panel" class="sources-panel panel" aria-labelledby="sources-title"><div class="panel-top"><div class="panel-title"><svg><use href="#i-link"/></svg><span id="sources-title">引用来源</span><span id="source-count" class="count-badge">0</span></div><button id="close-sources" class="icon-button mobile-only" aria-label="关闭引用来源"><svg><use href="#i-x"/></svg></button></div><div id="sources-content" class="sources-content"><div class="sources-empty"><div class="empty-icon"><svg><use href="#i-link"/></svg></div><h3>让答案有迹可循</h3><p>回答后，这里会展示引用的文档、页码与原文片段。</p><div class="source-example"><span class="source-number">1</span><div><span class="skeleton-line"></span><span class="skeleton-line short"></span><span class="skeleton-line"></span></div></div><span class="sources-hint">点击回答中的编号即可查看</span></div></div></aside>
+      </div>
+    </section>
+    <section id="page-documents" class="page" aria-labelledby="documents-title" hidden><div class="page-heading"><div><p class="eyebrow">A PLACE FOR YOUR SOURCES</p><h1 id="documents-title">资料库<span class="heading-dot">.</span></h1><p class="subtitle">管理知识来源，查看解析文本和索引状态。</p></div><button id="upload-button" class="button primary"><svg><use href="#i-upload"/></svg>上传文档</button></div><button id="dropzone" class="dropzone" type="button"><span class="upload-symbol"><svg><use href="#i-upload"/></svg></span><strong>拖放资料到这里，或点击选择文件</strong><span id="upload-formats">支持 PDF、Markdown、TXT</span><small id="upload-progress">上传后自动解析并建立检索索引</small></button><div class="library-toolbar"><div class="library-label">全部资料 <span id="library-count" class="count-badge">0</span></div><div class="search-box"><svg><use href="#i-search"/></svg><input id="document-search" type="search" placeholder="搜索文档名称" aria-label="搜索文档名称"></div><button id="refresh-docs" class="icon-button bordered" aria-label="刷新资料库"><svg><use href="#i-refresh"/></svg></button></div><div class="document-table panel"><table><thead><tr><th>文档名称</th><th>解析情况</th><th>状态</th><th>操作</th></tr></thead><tbody id="document-rows"></tbody></table><div id="documents-empty" class="table-empty"><svg><use href="#i-folder"/></svg><h3>还没有资料</h3><p>上传学习资料、讲义或题目，建立你的知识库。</p></div></div></section>
+    <section id="page-runs" class="page" aria-labelledby="runs-title" hidden><div class="page-heading"><div><p class="eyebrow">FOLLOW THE EVIDENCE</p><h1 id="runs-title">运行记录<span class="heading-dot">.</span></h1><p class="subtitle">查看本浏览器记录的问答，或通过运行 ID 查找详情。</p></div></div><form id="run-form" class="run-search panel"><svg><use href="#i-search"/></svg><label for="run-id" class="sr-only">运行 ID</label><input id="run-id" placeholder="粘贴 run_id 查看检索和模型调用记录" maxlength="128"><button class="button primary" type="submit">查看记录</button></form><div id="run-list" class="run-list"></div><div id="runs-empty" class="table-empty panel"><svg><use href="#i-clock"/></svg><h3>还没有运行记录</h3><p>完成一次问答后，可以在这里查看调用详情。</p></div></section>
+  </main>
+</div>
+<input type="file" id="file-input" class="sr-only" multiple accept=".pdf,.md,.txt" aria-label="选择上传文件">
+<dialog id="scope-dialog" class="dialog"><div class="dialog-heading"><div><h2>选择问答范围</h2><p>选择本轮资料范围；未选择时保持为空。点击“使用全部资料”才检索整个知识库。</p></div><button class="icon-button" data-close="scope-dialog" aria-label="关闭范围选择"><svg><use href="#i-x"/></svg></button></div><div id="scope-options" class="scope-options"></div><div class="dialog-footer"><button id="scope-all" class="button secondary">使用全部资料</button><button id="scope-apply" class="button primary">应用选择</button></div></dialog>
+<dialog id="detail-dialog" class="dialog wide"><div class="dialog-heading"><div><h2 id="detail-title">详情</h2><p id="detail-subtitle"></p></div><button class="icon-button" data-close="detail-dialog" aria-label="关闭详情"><svg><use href="#i-x"/></svg></button></div><div id="detail-content" class="detail-content"></div></dialog>
+<dialog id="delete-dialog" class="dialog small"><div class="dialog-heading"><h2>删除文档？</h2><button class="icon-button" data-close="delete-dialog" aria-label="取消删除"><svg><use href="#i-x"/></svg></button></div><p id="delete-description" class="delete-description"></p><div class="dialog-footer"><button class="button secondary" data-close="delete-dialog">取消</button><button id="confirm-delete" class="button danger">删除文档</button></div></dialog>
+<dialog id="title-dialog" class="dialog small"><div class="dialog-heading"><h2>重命名会话</h2><button class="icon-button" data-close="title-dialog" aria-label="关闭重命名窗口"><svg><use href="#i-x"/></svg></button></div><form id="title-form" class="title-form"><label for="title-input">会话标题</label><input id="title-input" maxlength="80" required><div class="dialog-footer"><button class="button secondary" type="button" data-close="title-dialog">取消</button><button class="button primary" type="submit">保存</button></div></form></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

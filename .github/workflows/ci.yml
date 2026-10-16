@@ -1,0 +1,23 @@
+# 仅执行项目 A 的离线模块测试和镜像构建，不调用真实付费模型。
+name: rag-ci
+on: [push, pull_request]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      STUDYFLOW_LLM_MODE: mock
+      STUDYFLOW_VECTOR_ENABLED: "false"
+      STUDYFLOW_RERANKER_ENABLED: "false"
+      STUDYFLOW_DATA_DIR: tests/.tmp/ci-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[ocr,vector,reranker]"
+      - run: python -m unittest discover -s tests -v
+      - run: docker compose config --quiet
+      - run: docker compose up --build --wait --wait-timeout 120
+      - run: python scripts/smoke_api.py
+      - if: always()
+        run: docker compose down

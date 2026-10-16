@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "date": "2026-10-15",
+  "status": "frozen_before_live_development_validation",
+  "data_origin": "public_synthetic_only",
+  "cases": [
+    {
+      "id": "D01",
+      "partition": "development",
+      "kind": "general",
+      "question": "什么是二分查找？请用通俗语言说明原理和使用条件。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "model_only"
+      ]
+    },
+    {
+      "id": "D02",
+      "partition": "development",
+      "kind": "document",
+      "fixture": "named-method.md",
+      "question": "这里的 Gradient projection 是什么意思，有哪些通用局限？请区分资料介绍与通用解释。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "model_only",
+        "document_and_model"
+      ],
+      "model_section_required": true
+    },
+    {
+      "id": "D03",
+      "partition": "development",
+      "kind": "document",
+      "fixture": "principle.md",
+      "question": "请解释梯度投影法的原理、用途和常见局限；资料没讲的部分可用通用知识补充。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "document_and_model"
+      ],
+      "model_section_required": true
+    },
+    {
+      "id": "D04",
+      "partition": "development",
+      "kind": "missing_fact",
+      "fixture": "named-method.md",
+      "question": "这份资料中实验参数的具体数值是多少？",
+      "statuses": [
+        "insufficient_evidence"
+      ],
+      "followup": "不需要猜实验数据，请解释实验参数的一般作用。"
+    },
+    {
+      "id": "D05",
+      "partition": "development",
+      "kind": "pending",
+      "fixture": "named-method.md",
+      "question": "刚才第二点是什么意思",
+      "choice": "方法用途",
+      "statuses": [
+        "clarification"
+      ],
+      "seeded_history": true
+    },
+    {
+      "id": "D06",
+      "partition": "development",
+      "kind": "refusal_focus",
+      "fixture": "named-method.md",
+      "question": "刚才第二点具体是什么意思",
+      "statuses": [
+        "answered"
+      ],
+      "seeded_history": true
+    },
+    {
+      "id": "D07",
+      "partition": "development",
+      "kind": "attachments",
+      "fixture": "report.md",
+      "second_fixture": "attendance.md",
+      "question": "这篇资料主要讲什么",
+      "followup": "回到报告的命名要求，解释这份通知给出的命名格式。",
+      "statuses": [
+        "answered"
+      ]
+    },
+    {
+      "id": "D08",
+      "partition": "development",
+      "kind": "strict_switch",
+      "question": "请解释二分查找的原理和使用条件。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "model_only"
+      ]
+    },
+    {
+      "id": "H01",
+      "partition": "holdout",
+      "kind": "general",
+      "question": "请解释什么是向量检索，并比较它与关键词检索的特点。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "model_only"
+      ]
+    },
+    {
+      "id": "H02",
+      "partition": "holdout",
+      "kind": "document",
+      "fixture": "binary.md",
+      "question": "二分查找的使用条件和常见限制是什么？资料未列出的部分请用通用知识补充。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "document_and_model",
+        "model_only"
+      ],
+      "model_section_required": true
+    },
+    {
+      "id": "H03",
+      "partition": "holdout",
+      "kind": "pending",
+      "fixture": "binary.md",
+      "question": "上面第二点再解释一下",
+      "choice": "适用条件",
+      "statuses": [
+        "clarification"
+      ],
+      "seeded_history": true
+    },
+    {
+      "id": "H04",
+      "partition": "holdout",
+      "kind": "document",
+      "fixture": "report.md",
+      "question": "这份通知的截止时间是什么？另外解释一般为什么常用PDF提交报告。",
+      "statuses": [
+        "answered"
+      ],
+      "basis": [
+        "document_and_model"
+      ],
+      "model_section_required": true,
+      "anchor": "6月30"
+    }
+  ]
+}

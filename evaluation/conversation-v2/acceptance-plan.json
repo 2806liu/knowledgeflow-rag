@@ -1,0 +1,1227 @@
+{
+  "schema_version": "2.0",
+  "date": "2026-10-15",
+  "project": "KnowledgeFlow RAG / 项目A",
+  "status": "implemented_verification_in_progress",
+  "design_document": "docs/conversation-rag-v2-final-design.md",
+  "fixture_status": "specified_not_generated_or_frozen",
+  "total_cases": 80,
+  "scope": "仅项目A，无跨项目依赖",
+  "fixtures": [
+    {
+      "id": "F-report",
+      "kind": "short_text_pdf_md_txt",
+      "definition": "合成《课程报告提交说明》：命名格式为学号-姓名-报告，提交为PDF，截止时间6月30日18:00；三个章节分别给规则、格式与检查项。",
+      "gold_key_points": [
+        "文档用于说明课程报告提交",
+        "学号-姓名-报告",
+        "PDF",
+        "6月30日18:00",
+        "提交前检查内容完整性"
+      ],
+      "public": true
+    },
+    {
+      "id": "F-attendance",
+      "kind": "short_text_pdf",
+      "definition": "合成《实验室考勤制度》：周一至周五每天4次打卡，上午、下午、晚上各一次及离开时一次；请假另有章节。",
+      "gold_key_points": [
+        "实验室考勤管理",
+        "周一至周五每天4次",
+        "三个时段加离开时一次",
+        "请假规则另有规定"
+      ],
+      "public": true
+    },
+    {
+      "id": "F-long",
+      "kind": "long_structured_pdf_md",
+      "definition": "合成12章节资料，每章含独立标题和唯一标注要点，超过单次输入预算；最后一章明确保留期限7年。实施时冻结12个gold要点，不用目录替代正文。",
+      "gold_key_points": [
+        "12章节各自唯一要点（实施前人工标注）",
+        "尾章保留期限7年"
+      ],
+      "public": true
+    },
+    {
+      "id": "F-scan",
+      "kind": "raster_pdf_png",
+      "definition": "将F-report合成原文渲染为扫描PDF和PNG，保留人工标注文字；真实OCR测试禁止注入识别结果。",
+      "public": true
+    },
+    {
+      "id": "F-mixed",
+      "kind": "same_page_mixed_pdf",
+      "definition": "同页含可提取正文和栅格化提交规则，答案要点分别位于文字与图片，人工核对物理页码。",
+      "public": true
+    },
+    {
+      "id": "F-empty",
+      "kind": "insufficient_document",
+      "definition": "空文件、空白PDF与提取后不足20个非空白字符的三类受控输入。",
+      "public": true
+    },
+    {
+      "id": "F-duplicate",
+      "kind": "identical_bytes",
+      "definition": "F-report完全相同字节，校验复用文档并幂等关联；不同请求ID不得重复索引。",
+      "public": true
+    },
+    {
+      "id": "F-same-name",
+      "kind": "same_filename_distinct_bytes",
+      "definition": "相同文件名的两份合成规则，分别为6月30日和7月1日截止；保留独立文档ID。",
+      "public": true
+    },
+    {
+      "id": "F-version",
+      "kind": "document_revision",
+      "definition": "F-report重新解析/索引后生成新revision与chunk IDs；删除前旧答案引用快照与当前来源区别处理。",
+      "public": true
+    }
+  ],
+  "modules": [
+    {
+      "id": "overview",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "O01",
+          "title": "短文直接概述",
+          "input": "选中F-report提问“这篇文章讲什么”。",
+          "expected": "进入overview而非要求BM25先命中；一次真实生成；覆盖标注要点与原始引用。",
+          "checks": [
+            "routing",
+            "coverage",
+            "key_points",
+            "citation_validity",
+            "citation_support",
+            "llm_trace"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O02",
+          "title": "不同概述表达",
+          "input": "分别问主要内容、核心要点、帮我概括该资料。",
+          "expected": "意图与文档对象一致；保存各表达结果。",
+          "checks": [
+            "routing",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O03",
+          "title": "长文分层概述",
+          "input": "F-long超过单次输入预算。",
+          "expected": "按章节分批并汇总；所有应覆盖章节有处理记录；每阶段输入不超限。",
+          "checks": [
+            "coverage",
+            "context_budget",
+            "call_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O04",
+          "title": "长文尾部要点",
+          "input": "概述F-long并核对末章。",
+          "expected": "摘要包含尾章保留期限7年，引用来自末章。",
+          "checks": [
+            "key_points",
+            "citation_support"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O05",
+          "title": "扫描文档概述",
+          "input": "真实OCR处理F-scan后概述。",
+          "expected": "OCR来源正确，提取和概述关键点均复核；模型失败不伪装资料不足。",
+          "checks": [
+            "ocr",
+            "key_points",
+            "citation_validity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O06",
+          "title": "同页图文混排概述",
+          "input": "概述F-mixed。",
+          "expected": "文字与图片中的必要要点均被覆盖，页码与chunk可回溯。",
+          "checks": [
+            "coverage",
+            "key_points",
+            "citation_validity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O07",
+          "title": "多文档无焦点澄清",
+          "input": "关联F-report与F-attendance，无活动文档，问这篇讲什么。",
+          "expected": "返回clarification；不猜对象、不执行全文概述。",
+          "checks": [
+            "ambiguity",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O08",
+          "title": "明确多文档概述",
+          "input": "明确要求分别概述F-report与F-attendance。",
+          "expected": "分别取证并区分来源，不将A的事实引用到B。",
+          "checks": [
+            "scope",
+            "key_points",
+            "citation_support"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O09",
+          "title": "缺少可用内容",
+          "input": "针对F-empty或未就绪附件发概述请求。",
+          "expected": "明确区分解析失败/资料未就绪/可用内容不足，无编造。",
+          "checks": [
+            "error_classification",
+            "no_fabrication"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O10",
+          "title": "删除后缓存失效",
+          "input": "先概述后删除文档，再次请求。",
+          "expected": "不返回旧缓存作为当前可用原文；明确来源不可用。",
+          "checks": [
+            "source_version",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O11",
+          "title": "重解析后缓存失效",
+          "input": "先概述F-report，再以F-version重新解析/索引。",
+          "expected": "基于当前revision重新生成或命中新版本缓存；新引用不使用旧chunk IDs。",
+          "checks": [
+            "source_version",
+            "cache"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "O12",
+          "title": "章节部分失败",
+          "input": "F-long一批生成超时或总预算耗尽。",
+          "expected": "partial_answer并列出缺失章节；成功部分引用有效；严重错误可整体失败但不得冒充完整概述。",
+          "checks": [
+            "partial_answer",
+            "coverage",
+            "error_classification"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    },
+    {
+      "id": "attachments",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "A01",
+          "title": "连续追加A再B",
+          "input": "同会话先上传F-report，再上传F-attendance。",
+          "expected": "会话关联A+B；已有选择按规则保留，不静默替换。",
+          "checks": [
+            "retention",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A02",
+          "title": "单批多文件",
+          "input": "一次选择三份独立合成文件。",
+          "expected": "分别展示状态；成功文件全部关联，范围一致。",
+          "checks": [
+            "retention",
+            "per_file_status"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A03",
+          "title": "批次部分失败",
+          "input": "同批上传正常文档与不支持格式。",
+          "expected": "正常文档保留；失败文件单独提示和操作，不整体回滚。",
+          "checks": [
+            "retention",
+            "per_file_status"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A04",
+          "title": "同字节重复上传",
+          "input": "先后上传F-report与F-duplicate。",
+          "expected": "复用一个文档，关联唯一，无重复索引。",
+          "checks": [
+            "idempotency"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A05",
+          "title": "同名不同内容",
+          "input": "追加F-same-name两版本。",
+          "expected": "保留独立文档ID和来源，文件名不能当唯一键。",
+          "checks": [
+            "provenance",
+            "retention"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A06",
+          "title": "移除会话关联",
+          "input": "从当前会话移除F-report。",
+          "expected": "原文档仍存在，可从资料库重新关联；后续请求不检索已移除文件。",
+          "checks": [
+            "detach_safety",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A07",
+          "title": "刷新恢复",
+          "input": "有消息与A+B附件时刷新页面。",
+          "expected": "恢复同会话、消息、范围和状态，不生成新会话替代。",
+          "checks": [
+            "restore",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A08",
+          "title": "新会话隔离",
+          "input": "会话甲关联A，创建会话乙并问这篇。",
+          "expected": "乙不继承甲附件或历史事实；按空范围提示。",
+          "checks": [
+            "session_isolation"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A09",
+          "title": "明确切换范围",
+          "input": "在A+B会话中只选择B，再选择all。",
+          "expected": "取证范围分别等于B和明确的全库；界面显示对应模式。",
+          "checks": [
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A10",
+          "title": "上传中的旧资料问答",
+          "input": "A就绪，B处理中，此时询问A。",
+          "expected": "正常使用A并提示B未就绪；不因B处理锁定整个聊天。",
+          "checks": [
+            "per_file_status",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A11",
+          "title": "问答发送时范围快照",
+          "input": "发送基于A的请求期间B变为ready。",
+          "expected": "该轮仍用A快照；下一轮可按用户启用集合使用B。",
+          "checks": [
+            "snapshot"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "A12",
+          "title": "追加单份切换焦点与晚完成保护",
+          "input": "先讨论A，单独追加B成功，再问这篇；另注入旧任务晚完成与用户手动切换。",
+          "expected": "默认指向新B，保留A；多份追加则澄清；旧任务不得覆盖更新的用户焦点。",
+          "checks": [
+            "focus",
+            "scope",
+            "snapshot"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    },
+    {
+      "id": "uploads",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "U01",
+          "title": "传输超时恢复",
+          "input": "受控慢上传达到配置期限。",
+          "expected": "按deadline+2s内恢复操作入口；可重试，不永久置busy。",
+          "checks": [
+            "deadline",
+            "ui_recovery"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U02",
+          "title": "后台处理超时",
+          "input": "受控解析任务超过处理期限。",
+          "expected": "任务超时失败且不ready；前端显示处理超时而非文件过大。",
+          "checks": [
+            "deadline",
+            "error_classification"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U03",
+          "title": "传输中用户取消",
+          "input": "XHR传输过程中点击取消。",
+          "expected": "前台1s内反馈；无已接收任务时清理临时文件，不生成可检索文档。",
+          "checks": [
+            "cancel",
+            "cleanup",
+            "ui_recovery"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U04",
+          "title": "排队任务取消",
+          "input": "处理器忙时取消队列中的任务。",
+          "expected": "队列任务确认cancelled，不开始解析，不发布。",
+          "checks": [
+            "cancel",
+            "publish_safety"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U05",
+          "title": "OCR处理中协作取消",
+          "input": "OCR页处理中取消，随后到达检查点。",
+          "expected": "先cancel_requested后cancelled；只在服务端确认后展示取消完成。",
+          "checks": [
+            "cancel",
+            "publish_safety"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U06",
+          "title": "完成取消竞争",
+          "input": "分别控制发布先完成与取消先确认。",
+          "expected": "前者返回已完成/409并保留文档；后者不再发布；状态一致。",
+          "checks": [
+            "race",
+            "publish_safety"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U07",
+          "title": "创建响应丢失",
+          "input": "服务端接收任务后丢弃202响应。",
+          "expected": "用client_request_id恢复已有任务，不盲目新建重复文档。",
+          "checks": [
+            "idempotency",
+            "restore"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U08",
+          "title": "重复点击与重试",
+          "input": "同一幂等键并发提交、失败后重试。",
+          "expected": "最多一次发布与关联；attempt可审计，重试有上限。",
+          "checks": [
+            "idempotency",
+            "retry_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U09",
+          "title": "超出文件大小",
+          "input": "在缩小的测试上限下上传超限文件。",
+          "expected": "UPLOAD_TOO_LARGE，不自动重试；旧资料不变。",
+          "checks": [
+            "error_classification",
+            "retry_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U10",
+          "title": "格式不支持",
+          "input": "上传DOCX/损坏签名等受控输入。",
+          "expected": "分别识别不支持格式或非法文件；按钮恢复，错误可读。",
+          "checks": [
+            "error_classification",
+            "ui_recovery"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U11",
+          "title": "OCR资源限制",
+          "input": "分别注入OCR页数、像素、区域上限。",
+          "expected": "返回对应错误码；不能统一显示文件过大；不自动重试。",
+          "checks": [
+            "error_classification"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U12",
+          "title": "识别模型不可用",
+          "input": "注入OCR模型缺失或初始化失败。",
+          "expected": "OCR_UNAVAILABLE；明确模型问题，不误报资料不足。",
+          "checks": [
+            "error_classification"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U13",
+          "title": "状态轮询失败",
+          "input": "短时断网再恢复。",
+          "expected": "有限重试；恢复同一job，不把查询失败改成任务失败/ready。",
+          "checks": [
+            "restore",
+            "retry_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U14",
+          "title": "刷新与服务重启",
+          "input": "有运行中任务时刷新页面，再模拟进程重启。",
+          "expected": "页面恢复任务；服务将未完成attempt标interrupted，可显式重试。",
+          "checks": [
+            "restore",
+            "publish_safety"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U15",
+          "title": "旧文档与成功同伴保护",
+          "input": "一组成功、失败、取消任务混合执行。",
+          "expected": "只清理对应任务暂存，已有文档与本批成功文件均保留。",
+          "checks": [
+            "cleanup",
+            "retention"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "U16",
+          "title": "重选文件和新增排队",
+          "input": "第一次失败后重新选同文件；另一任务运行时再加附件。",
+          "expected": "change可再次触发，新附件入队；入口不因整个批次持续禁用，真实进度可见。",
+          "checks": [
+            "ui_recovery",
+            "per_file_status"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    },
+    {
+      "id": "dialogue",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "C01",
+          "title": "唯一资料这篇",
+          "input": "仅关联就绪A，问这篇讲什么。",
+          "expected": "解析overview，范围A。",
+          "checks": [
+            "resolution",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C02",
+          "title": "显式活动文档",
+          "input": "A+B关联且活动文档B，问这篇讲什么。",
+          "expected": "解析到B。",
+          "checks": [
+            "resolution",
+            "focus"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C03",
+          "title": "多文档对象歧义",
+          "input": "A+B无活动文档，问这篇。",
+          "expected": "clarification，不猜对象。",
+          "checks": [
+            "ambiguity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C04",
+          "title": "刚才第二点",
+          "input": "上一回答有3个answer_units，追问第二点。",
+          "expected": "解析到unit2主题并重新取证，保留原问题。",
+          "checks": [
+            "resolution",
+            "ordinal"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C05",
+          "title": "引用2不是第二点",
+          "input": "第一条内容包含引用[2]，用户问第二点。",
+          "expected": "使用条目unit2，不按citation_number=2定位。",
+          "checks": [
+            "ordinal"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C06",
+          "title": "再详细一点",
+          "input": "上一轮实质回答主题明确，追问展开。",
+          "expected": "沿用主题构造具体检索问题。",
+          "checks": [
+            "resolution"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C07",
+          "title": "解释第一个原则",
+          "input": "上一回答列出多个原则。",
+          "expected": "仅取第一原则相关证据，生成有新证据的解释。",
+          "checks": [
+            "ordinal",
+            "evidence_recall"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C08",
+          "title": "明确切换主题",
+          "input": "前文问考勤，当前完整问题问课程提交。",
+          "expected": "以当前明确主题为准，不被历史考勤干扰。",
+          "checks": [
+            "resolution"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C09",
+          "title": "明确切换文档",
+          "input": "用户明确指定B，历史在讨论A。",
+          "expected": "在允许范围内切换B并记录，不能仍检索A。",
+          "checks": [
+            "resolution",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C10",
+          "title": "上一轮拒答后展开",
+          "input": "上一轮无证据拒答，用户说再详细一点。",
+          "expected": "澄清所指问题或重试明确主题，不把拒答文案当事实扩写。",
+          "checks": [
+            "ambiguity",
+            "no_fabrication"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C11",
+          "title": "上一轮错误后展开",
+          "input": "上一轮模型调用失败。",
+          "expected": "不制造上一回答内容；提示重试或澄清。",
+          "checks": [
+            "ambiguity",
+            "no_fabrication"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C12",
+          "title": "请求不存在的第九点",
+          "input": "上一回答只有三条。",
+          "expected": "澄清条目范围，不编造第九点。",
+          "checks": [
+            "ambiguity",
+            "ordinal"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C13",
+          "title": "历史文档被删除",
+          "input": "旧回答引用A，删除A后追问该结论。",
+          "expected": "提示来源不可用，不直接复述成当前有据答案。",
+          "checks": [
+            "source_version",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C14",
+          "title": "重解析后追问",
+          "input": "旧回答引用旧revision，A已重新解析。",
+          "expected": "重新取证当前版本，不能混用旧chunk IDs。",
+          "checks": [
+            "source_version"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C15",
+          "title": "跨会话相同追问",
+          "input": "会话甲有三条回答，会话乙说第二点。",
+          "expected": "不读取甲；乙要求澄清。",
+          "checks": [
+            "session_isolation",
+            "ambiguity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C16",
+          "title": "长历史预算",
+          "input": "多轮完整对话超出预算。",
+          "expected": "保留当前主题和必要证据，按完整轮次裁剪，记录计数方法。",
+          "checks": [
+            "context_budget",
+            "resolution"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C17",
+          "title": "重复问句的不同轮次",
+          "input": "不同主题中出现相同原问句。",
+          "expected": "turn_id定位正确，各轮日志独立，不用文本相等替代轮次ID。",
+          "checks": [
+            "trace",
+            "resolution"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C18",
+          "title": "解析模型超时",
+          "input": "注入QueryResolver LLM超时。",
+          "expected": "使用可信规则结果或明确澄清/错误，不无界重试、不放宽范围。",
+          "checks": [
+            "deadline",
+            "scope"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C19",
+          "title": "解析结果越范围",
+          "input": "注入解析LLM返回未关联文档ID/不存在unit。",
+          "expected": "校验拒绝，澄清或报错；实际检索无越界来源。",
+          "checks": [
+            "scope",
+            "ordinal"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "C20",
+          "title": "历史有答案但当前无支持",
+          "input": "历史助手说法存在，当前文档无相应证据。",
+          "expected": "历史仅用于定位；无依据部分拒答，不将历史当原文。",
+          "checks": [
+            "no_fabrication",
+            "evidence_recall"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    },
+    {
+      "id": "memory",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "M01",
+          "title": "当前问题与完整轮次",
+          "input": "有最近三轮完整回答并发新问题。",
+          "expected": "当前问题只加入一次，近期问答成对保留。",
+          "checks": [
+            "round_integrity",
+            "current_question"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M02",
+          "title": "滚动压缩触发与水位",
+          "input": "历史接近阈值，较早轮次进入一次摘要。",
+          "expected": "源轮次区间准确，最近窗口不重复压缩，水位单调前移。",
+          "checks": [
+            "summary_watermark",
+            "call_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M03",
+          "title": "摘要来源可审计",
+          "input": "生成历史主题摘要。",
+          "expected": "source_turn_ids和history_digest对应原记录，原消息不删除。",
+          "checks": [
+            "summary_provenance"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M04",
+          "title": "压缩后的显式条目追问",
+          "input": "早期回答已摘要，用户明确追问该轮第二点。",
+          "expected": "按turn/unit定位必要原轮次，不把引用[2]当条目。",
+          "checks": [
+            "pinned_reference",
+            "ordinal"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M05",
+          "title": "用户纠正与撤回",
+          "input": "用户纠正早期主题或要求，随后压缩与追问。",
+          "expected": "保留纠正与撤回状态，旧说法不重新成为当前要求。",
+          "checks": [
+            "correction_retention",
+            "summary_fidelity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M06",
+          "title": "说法来源归属",
+          "input": "历史含用户猜测、无证据模型回答和已核验原文。",
+          "expected": "摘要保留归属，不混写成全部经文档证明的事实。",
+          "checks": [
+            "summary_fidelity",
+            "no_fabrication"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M07",
+          "title": "摘要失败不锁会话",
+          "input": "摘要生成超时或输出非法结构。",
+          "expected": "保留原消息和已验证旧摘要；预算内继续或澄清，真实记录失败。",
+          "checks": [
+            "ui_recovery",
+            "message_integrity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M08",
+          "title": "并发摘要版本竞争",
+          "input": "旧摘要生成晚于新一轮状态更新。",
+          "expected": "过时digest/revision不能覆盖较新状态，可重算或丢弃。",
+          "checks": [
+            "revision",
+            "race"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M09",
+          "title": "跨会话摘要隔离",
+          "input": "两个会话讨论不同文档。",
+          "expected": "读取/压缩只包含本会话，不带入另一会话资料和主题。",
+          "checks": [
+            "session_isolation"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M10",
+          "title": "多次滚动后的漂移",
+          "input": "对固定长对话连续执行多次增量摘要。",
+          "expected": "标注主题/约束保留达标，无新事实，水位无遗漏重复。",
+          "checks": [
+            "summary_fidelity",
+            "summary_watermark"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M11",
+          "title": "资料版本变化",
+          "input": "历史来源被删除或重解析后再次使用主题摘要。",
+          "expected": "主题可用于定位但事实重新取证；旧来源不可直接成为当前引用。",
+          "checks": [
+            "source_version",
+            "grounding"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "M12",
+          "title": "短会话成本与重启恢复",
+          "input": "短对话不达阈值；长对话摘要后服务重启。",
+          "expected": "短对话额外摘要调用为0；长会话恢复正确水位与主题，无消息丢失。",
+          "checks": [
+            "call_budget",
+            "restore"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    },
+    {
+      "id": "context_budget",
+      "status": "planned_not_executed",
+      "cases": [
+        {
+          "id": "B01",
+          "title": "全输入预算核算",
+          "input": "注入系统提示、长问题、历史、证据和引用封装。",
+          "expected": "合计输入加输出预留与余量符合声明窗口，输出完整trace。",
+          "checks": [
+            "context_budget",
+            "trace"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B02",
+          "title": "未知模型保守估算",
+          "input": "无兼容tokenizer的模型名称。",
+          "expected": "明确记录估算方法及消息开销，估算不写成实际usage。",
+          "checks": [
+            "count_method",
+            "usage_integrity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B03",
+          "title": "完整轮次裁剪",
+          "input": "缩小预算，历史只能保留部分轮次。",
+          "expected": "按完整问答移除，当前问题与必要条目保留，裁剪原因可见。",
+          "checks": [
+            "round_integrity",
+            "pinned_reference"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B04",
+          "title": "必要证据超过预算",
+          "input": "所有必要列表/章节证据无法一次装入。",
+          "expected": "分阶段处理或明确部分回答/超限，不能静默删项后声称完整。",
+          "checks": [
+            "context_budget",
+            "partial_answer"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B05",
+          "title": "最终封装复检",
+          "input": "构造接近预算边界的引用和消息结构。",
+          "expected": "封装后重新核算；不因JSON/引用开销突破预算；版本/引用映射一致。",
+          "checks": [
+            "context_budget",
+            "citation_validity"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B06",
+          "title": "所有模型阶段预算",
+          "input": "触发查询解析、摘要和概述map/reduce及最终生成。",
+          "expected": "每阶段都有独立预算记录和调用上限，无漏检阶段。",
+          "checks": [
+            "context_budget",
+            "call_budget"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B07",
+          "title": "范围版本失效",
+          "input": "构建期间原文被删除或重新解析。",
+          "expected": "按快照检测失效并重新取证或明确失败，不塞入过时来源。",
+          "checks": [
+            "scope",
+            "source_version"
+          ],
+          "status": "not_run"
+        },
+        {
+          "id": "B08",
+          "title": "系统与当前问题不能截断",
+          "input": "配置非法窗口/输出预留或问题本身超限。",
+          "expected": "拒绝非法配置/明确输入超限；不截断系统规则或用户问题以伪装成功。",
+          "checks": [
+            "context_budget",
+            "current_question"
+          ],
+          "status": "not_run"
+        }
+      ],
+      "implementation_status": "implemented"
+    }
+  ],
+  "acceptance_metrics": [
+    {
+      "id": "overview_keypoint_macro_recall",
+      "target": 0.9,
+      "min_each_case": 0.8,
+      "method": "人工核对gold关键点，按题宏平均",
+      "actual": null
+    },
+    {
+      "id": "citation_atomic_claim_support",
+      "target": 0.95,
+      "method": "逐原子事实核对实际引用原文；助手初审+独立人工确认",
+      "actual": null
+    },
+    {
+      "id": "citation_location_validity",
+      "target": 1,
+      "method": "核对文档范围、版本、chunk、物理页和snippet",
+      "actual": null
+    },
+    {
+      "id": "overview_section_processing_coverage",
+      "target": 1,
+      "method": "完整概述处理全部应覆盖章节；未满必须标部分回答",
+      "actual": null
+    },
+    {
+      "id": "dialogue_joint_resolution",
+      "target": 0.95,
+      "min_passed_cases": 19,
+      "total_cases": 20,
+      "method": "意图、对象、条目主题及改写语义联合判定",
+      "actual": null
+    },
+    {
+      "id": "followup_necessary_evidence_recall_at_4",
+      "target": 0.9,
+      "method": "仅统计标注可回答追问，沿用必要证据Recall定义",
+      "actual": null
+    },
+    {
+      "id": "attachment_retention_scope_idempotency_restore",
+      "target": 1,
+      "actual": null
+    },
+    {
+      "id": "upload_ui_recovery_error_classification",
+      "target": 1,
+      "actual": null
+    },
+    {
+      "id": "ui_cancel_feedback_seconds",
+      "max": 1,
+      "scope": "浏览器前台反馈；不代表服务端已取消",
+      "actual": null
+    },
+    {
+      "id": "client_timeout_recovery_over_deadline_seconds",
+      "max": 2,
+      "actual": null
+    },
+    {
+      "id": "out_of_scope_sources",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "publications_after_confirmed_cancel",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "duplicate_publications",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "serious_fabrications",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "local_status_query_p95_seconds",
+      "max": 1,
+      "min_samples": 20,
+      "actual": null
+    },
+    {
+      "id": "ordinary_qa_orchestration_p95_added_ms",
+      "max": 100,
+      "min_paired_samples": 20,
+      "scope": "排除LLM与网络生成时间，报告相同配置配对样本",
+      "actual": null
+    },
+    {
+      "id": "memory_topic_constraint_retention",
+      "target": 0.95,
+      "method": "人工核对固定对话主题与约束；含重复滚动后的漂移检查",
+      "actual": null
+    },
+    {
+      "id": "memory_critical_correction_and_reference_retention",
+      "target": 1.0,
+      "method": "核对明确指代条目和用户纠正/撤回",
+      "actual": null
+    },
+    {
+      "id": "summary_turn_watermark_revision_integrity",
+      "target": 1.0,
+      "actual": null
+    },
+    {
+      "id": "memory_cross_session_leakage_or_invented_facts",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "message_loss",
+      "max": 0,
+      "blocking": true,
+      "actual": null
+    },
+    {
+      "id": "declared_context_budget_compliance",
+      "target": 1.0,
+      "method": "各模型阶段按已声明精确/保守计数方法校验；保留估算与usage差异",
+      "actual": null
+    },
+    {
+      "id": "complete_turn_and_citation_mapping_integrity",
+      "target": 1.0,
+      "actual": null
+    },
+    {
+      "id": "context_build_drop_reason_trace_coverage",
+      "target": 1.0,
+      "actual": null
+    },
+    {
+      "id": "summary_aux_calls_below_trigger",
+      "max": 0,
+      "actual": null
+    }
+  ],
+  "regression": {
+    "historical_unittest_count": 103,
+    "baseline_reenumeration_required": true,
+    "retrieval_dev_queries": 35,
+    "answer_queries": 40,
+    "policy": "重新冻结同语料同配置基线；Recall@4与MRR@4不退化；新答案重新语义复核；新增验收集与调参集分开"
+  },
+  "evidence_policy": {
+    "model_stub_success_is_not_semantic_acceptance": true,
+    "api_pass_is_not_browser_acceptance": true,
+    "private_documents_and_outputs_excluded_from_public_release": true,
+    "no_pass_results_yet": true,
+    "all_semantic_cases_must_be_reviewed_before_full_acceptance": true,
+    "pending_cases_not_silently_excluded": true
+  },
+  "report_fields": [
+    "case_id",
+    "status",
+    "checks",
+    "original_query",
+    "resolved_query",
+    "scope_snapshot",
+    "source_versions",
+    "answer",
+    "citations",
+    "llm_trace",
+    "latency_ms",
+    "semantic_review",
+    "failure_reason",
+    "cleanup_result",
+    "memory_revision",
+    "summary_source_turn_ids",
+    "context_budget",
+    "count_method",
+    "dropped_items"
+  ],
+  "product_decisions": [
+    {
+      "id": "attachment_focus",
+      "confirmed_by_user": true,
+      "value": "single newly added document B becomes active when ready; A remains associated; multiple files require clarification"
+    },
+    {
+      "id": "memory_scope",
+      "confirmed_by_user": true,
+      "value": "recent complete turns + rolling summary + structured state in this release; semantic/time-decay memory scoring deferred"
+    }
+  ],
+  "runtime_identity": {
+    "canonical_field": "session_id",
+    "conversation_table_id": "same_as_session_id",
+    "additional_conversation_id_field": false
+  },
+  "initial_config": {
+    "recent_complete_turns": 3,
+    "history_target_budget_units": 2000,
+    "summary_target_budget_units": 600,
+    "query_resolution_max_aux_calls": 1,
+    "overview_max_calls": 24,
+    "overview_total_deadline_seconds": 240,
+    "upload_transfer_deadline_seconds": 120,
+    "ingestion_total_deadline_seconds": 600,
+    "units_require_recorded_count_method": true,
+    "overview_max_output_tokens": 4096,
+    "overview_attempt_budget_includes_retries": true
+  },
+  "deferred_experiments": [
+    "semantic history retrieval",
+    "semantic similarity with temporal decay",
+    "time-decay floor and tau ablation"
+  ],
+  "implementation_status": "six_modules_integrated",
+  "functional_acceptance_status": "automated_passed_remaining_gates_pending"
+}

@@ -1,0 +1,20 @@
+# 项目 A 独立发布时同样生效；不依赖父工作区的忽略规则。
+.env
+.env.*
+!.env.example
+!.env.docker.example
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.studyflow*/
+.skillflow*/
+tests/.tmp/
+tmp/
+dist/
+build/
+references/
+Test_RagFile/
+evaluation/results/
+request.json
+response.json

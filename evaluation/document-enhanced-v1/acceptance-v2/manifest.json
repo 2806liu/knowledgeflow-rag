@@ -1,0 +1,12 @@
+{
+  "status": "frozen_before_v2_live_calls",
+  "files": {
+    "suite.json": "11c3db20c201c420102104cd3a0f7448d3c348e1b6d8510f8300828bf3d5ef6a",
+    "fixtures/attendance.md": "9229899e8cded182ca0c104865b9f2b13bdf0aa4701fba0ce75bbda5bd116e3c",
+    "fixtures/binary.md": "fe432f8f7378c1951c5c31321853a00ec7ad407580c23c608ccceec48aeb231a",
+    "fixtures/named-method.md": "6fd91e478afa6d35913e2e959c3015835f5da9a01e04a5005825f82111a0a076",
+    "fixtures/principle.md": "20fb3b6727fcc5e2a2635659bbff9dae8006a32e7b9d011cf863bc30d0d8b64f",
+    "fixtures/report.md": "f0d1e763be77a8a6bfc702b0911a96115f998067c002d9ff55750c165b61a89c",
+    "fixtures/retry.md": "04b5ebc73d8378494b92da030b773499c74649555f4a68dea900d789ecd7ec4e"
+  }
+}
