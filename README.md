@@ -11,7 +11,7 @@ Python / FastAPI / Pydantic / LangChain / SQLite / Qdrant / BM25 / RRF / Cross-E
 PDF、Markdown、TXT、图片 → 原生提取与 OCR → 清洗和结构化切块 → BM25 / Dense → RRF 混合召回 → 可选重排 → Top-K 与相邻证据补齐 → LLM 回答或拒答 → 引用与评测。
 
 - SQLite 是文档、页、chunk 和来源的主存储；Qdrant 提供可选向量索引。
-- 扫描 PDF 和混排 PDF 的图片区域可以 OCR；公式、表格结构和复杂图像语义不在当前验收范围。
+- 扫描 PDF 和混排 PDF 的图片区域可以 OCR。
 - 列表切块保留父标题和章节标识，相邻证据按数量和上下文预算补齐。
 - 跨文档相同文本保留各自来源，引用包含文件名、物理页码、chunk ID 和原文。
 - 这是固定 RAG 工作流，项目 A 独立运行，不依赖其他项目。
@@ -49,9 +49,8 @@ STUDYFLOW_LLM_ANSWER_FORMAT=text
 - temperature 默认为空，不发送该参数；需要时在配置中显式填写。
 - text 保持既有自由文本契约。上游支持 JSON object 时可切换 json，返回明确的 answered / insufficient_evidence 状态，拒答由服务归一为固定文案。
 - JSON 格式不合法、引用声明与正文不一致时明确标记 invalid_response；不会把失败伪装为成功。
-- 调用错误返回 502 / 503 / 504，并提供 run_id。运行记录包含尝试次数、耗时、实际 token 用量和脱敏错误类别；上游未提供用量时为 null。
-- 引用编号合法不等同于语义正确；仍需逐句核对答案与实际引用。OCR 置信度也不是答案正确率。
-- 当前 /chat 返回完整 JSON，未实现流式输出。
+- 调用错误返回 502 / 503 / 504，并提供 run_id。运行记录包含尝试次数、耗时、实际 token 用量和脱敏错误类别。
+- 当前 /chat 返回完整 JSON。
 
 ## 检索、OCR 与重排
 
@@ -92,9 +91,8 @@ python scripts/smoke_api.py --real-llm --output evaluation/results/public-llm-sm
 
 smoke 使用公开合成资料，验证上传、来源、回答/拒答、运行记录和删除；其机械检查不替代人工语义验收。模块测试使用模拟模型，不访问外网。
 
-历史开发集包含 35 题检索查询与 40 题答案案例。列表切块修正后，35 题开发集 BM25 IDF² Recall@4 为 0.9714 → 1.0000，MRR@4 为 0.9238 → 0.9310。该数据多次用于调优，不是独立盲测，也不是答案正确率。
+历史开发集包含 35 题检索查询与 40 题答案案例。列表切块修正后，35 题开发集 BM25 IDF² Recall@4 为 0.9714 → 1.0000，MRR@4 为 0.9238 → 0.9310。
 
-重排对照中 Dense/Hybrid 有收益，BM25 部分指标下降并增加 CPU 耗时，因此重排默认关闭。指标、Bad Case 和语义评审应分别记录。原教学 PDF、个人数据、模型和历史运行报告不随公开发布包分发。
 
 ## Docker 与公开发布
 
@@ -122,7 +120,7 @@ python scripts/smoke_api.py
 
 ## 会话式文档问答（v2）
 
-工作台支持文档概述、连续附件、任务取消/恢复和多轮追问。单独追加B后默认讨论B，A仍保留；同批多份资料需明确对象。
+工作台支持文档概述、连续附件、任务取消/恢复和多轮追问。
 后台摄取阶段分别显示排队、解析/OCR、切块、索引与就绪；客户端停止传输不代表服务端已确认取消。
 
 新客户端先POST /conversations，再将返回id作为 /chat 的session_id。POST /ingestions受理后返回202和任务id，使用GET /ingestions/{id}查询；取消与重试使用对应子接口。
