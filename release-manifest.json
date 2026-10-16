@@ -7,7 +7,7 @@
     ".github/workflows/ci.yml": "a9860eb59cef80c3bee491fa29383ed20bd95cb32b1ffbd1901c5a22dd1e0838",
     ".gitignore": "4390619e6642d61e15a2feca0787a5f4bb19917c646329e120834f855420f751",
     "Dockerfile": "a8950191eda717c838809d45a2cd9477a0d0c8f67206a60a5750107af73ba4df",
-    "README.md": "d1b9eea6351d4215a51888b37b3239074156bc3b695cb81dbacae1b9cbdf74bc",
+    "README.md": "3982b8b014818894a401fb03d0cdcea43e714de8b757730b1f8b4d2cad49e4ce",
     "app/__init__.py": "e8a0d86f321b79a475d76bb0f3a998b6f673e23f0412b94b07afd595052c9cb4",
     "app/config.py": "3c55e1d0e5fd95cc6b9e4f3a6683302dac491dcaa0f6959c3dd54c659b884185",
     "app/conversation.py": "c02982d2c2c93634780dbdea10a86b051aff6af707d068a7760baae7d6830d85",
