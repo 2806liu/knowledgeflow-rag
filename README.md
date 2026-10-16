@@ -1,163 +1,275 @@
 # KnowledgeFlow RAG
 
-可评测的多模态文档知识库与问答服务。面向讲义、题目 PDF 和学习资料，提供上传、解析、索引、检索、带来源回答、删除与重新解析闭环。
+面向讲义、论文和学习资料的文档知识问答服务。支持多格式解析、混合检索、多文档比较、长文概述、连续追问、会话归档与引用回溯。
 
-当前架构、长文概述、多轮记忆、双篇比较、历史会话及验收边界汇总见 [项目 A 总览](docs/project-a-overview.md)。
+**技术栈：** Python · FastAPI · LangChain · SQLite · BM25 · Qdrant · RRF · ONNX Cross-Encoder · RapidOCR · 原生 JavaScript · Docker Compose。
 
-## 架构与技术栈
+## 1. 总体架构
 
-Python / FastAPI / Pydantic / LangChain / SQLite / Qdrant / BM25 / RRF / Cross-Encoder / RapidOCR / ONNX Runtime。
+页面与 API 同源部署；SQLite 保存原文和业务状态，Qdrant 按需提供向量检索。问答采用明确的检索、取证和校验工作流。
 
-PDF、Markdown、TXT、图片 → 原生提取与 OCR → 清洗和结构化切块 → BM25 / Dense → RRF 混合召回 → 可选重排 → Top-K 与相邻证据补齐 → LLM 回答或拒答 → 引用与评测。
+```mermaid
+flowchart TB
+    UI["文档工作台<br/>上传 · 对话 · 历史 · 引用"] --> API["FastAPI 服务"]
+    API --> ING["摄取任务<br/>排队 · 取消 · 重试"]
+    ING --> PARSE["PDF / 图片 / Markdown / TXT<br/>原生文本提取与 RapidOCR"]
+    PARSE --> CHUNK["清洗与结构化切块<br/>保留页码、父标题和列表关系"]
+    CHUNK --> DB[("SQLite<br/>文档 · 原文块 · 版本")]
+    CHUNK --> VEC[("可选 Qdrant<br/>Embedding 向量索引")]
+    API --> PLAN["QueryPlanner / EnhancedResolver<br/>意图 · 范围 · 历史对象"]
+    STATE[("SQLite 会话状态<br/>轮次 · 摘要 · 焦点 · 比较任务")] --> PLAN
+    PLAN --> RET["BM25 / Dense / Hybrid RRF<br/>可选 Cross-Encoder 重排"]
+    DB --> RET
+    VEC --> RET
+    PLAN --> OVER["全文概述<br/>分批 Map 与分层 Reduce"]
+    DB --> OVER
+    RET --> CTX["证据选择与输入预算"]
+    OVER --> CTX
+    CTX --> LLM["LLM 调用与限次修复"]
+    LLM --> CHECK["引用编号 · 文档归属 · 方面状态校验"]
+    CHECK --> OUT["答案 / 部分结果 / 缺失说明"]
+    OUT --> UI
+    OUT --> STATE
+    API --> TRACE[("运行记录<br/>检索排名 · Token · 耗时 · 异常")]
+```
 
-- SQLite 是文档、页、chunk 和来源的主存储；Qdrant 提供可选向量索引。
-- 扫描 PDF 和混排 PDF 的图片区域可以 OCR。
-- 列表切块保留父标题和章节标识，相邻证据按数量和上下文预算补齐。
-- 跨文档相同文本保留各自来源，引用包含文件名、物理页码、chunk ID 和原文。
-- 这是固定 RAG 工作流，项目 A 独立运行，不依赖其他项目。
+- **解析与来源：** 扫描 PDF、图片及混排 PDF 的图片区域可使用 OCR；保存文件名、物理页码、chunk ID、提取方式和原文。
+- **检索与取证：** 按“文档 × 问题方面”分别召回、去重和选择证据，保留多文档覆盖；仅对缺口补检索，没有新增 chunk 时停止重复取证。
+- **答案边界：** 指定论文的研究重点、结论和实验数值必须有原文支持；增强模式的通用知识单独标注。引用格式校验之外，语义质量仍需对照原文复核。
+- **会话体验：** 自动保存会话，支持标题搜索、重命名、归档与恢复；长会话分页加载。生成期间限制切换，防止响应进入其他会话。
 
-## 本地启动
+## 2. 问题如何选择处理路径
 
-要求 Python 3.10+；推荐 3.12。先复制 .env.example 为 .env，再填写自己的配置。
+上传先建立原文索引；只有全文概述请求进入 Map-Reduce。日常事实问答和论文比较使用定向检索。
+
+```mermaid
+flowchart TD
+    Q["用户问题"] --> S["冻结本轮文档范围、版本与回答策略"]
+    S --> H["定位当前焦点、历史条目或比较任务"]
+    H --> B{"对象唯一且在选定范围内？"}
+    B -->|否| CL["列出候选或提示选择已有文档"]
+    B -->|是| P{"问题意图"}
+    P -->|全文概述| O["复用同版本缓存<br/>或继续未完成的 Map 批次"]
+    P -->|文档事实或多文档比较| R["按文档与方面检索原文"]
+    P -->|历史条目追问| U["按稳定条目 ID 定位来源<br/>核验版本后回读原文"]
+    R --> C{"证据是否覆盖问题？"}
+    C -->|有缺口且允许补检索| E["仅补缺失方面<br/>记录新增 chunk 数"]
+    E --> G["保留已取得证据与具体缺口"]
+    C -->|已有证据或达到限制| G
+    U --> G
+    O --> G
+    G --> A["预算内生成结构化回答"]
+    A --> V{"来源与状态校验"}
+    V -->|通过| OK["展示答案、原文引用与未解决方面"]
+    V -->|结构冲突| F["独立有限预算修复"]
+    F --> FIN["再次校验<br/>失败则明确报告校验错误"]
+```
+
+当前明确选中两篇时，“研究重点”默认分别回答；“区别”增加比较方面。明确提到历史论文时，按文件名及比较任务定位。历史对象不在本轮范围内时提示选中已有文档；重新索引后使用当前版本取证。
+
+### 模块职责
+
+| 模块 | 设计职责 |
+|---|---|
+| `app/main.py`、会话与摄取 API | 文档管理、会话索引、轮次分页、上传任务和运行查询 |
+| `app/rag/retrieval.py`、`aspect_evidence.py` | 多策略召回、方面取证、证据去重与覆盖 |
+| `app/rag/query_planner.py`、`enhanced_resolver.py` | 问题规划、选定范围约束、历史定位与解析恢复 |
+| `app/rag/structured_overview.py`、`overview_repository.py` | 结构化 Map-Reduce、缓存、批次进度与来源链 |
+| `app/rag/memory.py`、`dialogue_focus.py` | 近期轮次、滚动摘要、用户纠正和实质主题 |
+| `app/rag/context_builder.py` | 分组件检查输入预算，按完整轮次裁剪历史 |
+| `app/enhanced_flow.py`、`app/rag/enhanced_answer.py` | 增强回答编排、补取证与限次结构修复 |
+| `app/rag/answer_policy.py` | 引用、来源归属与回答方面状态校验 |
+| `app/static/` | 无前端构建依赖的中文工作台 |
+| `evaluation/`、`tests/` | 合成任务评测、配对成本实验与回归 |
+
+## 3. 长文概述与会话记忆
+
+### 长文不一次性塞入模型
+
+```mermaid
+flowchart LR
+    D["当前版本原文块"] --> M["按输入预算分批 Map"]
+    M --> SAVE[("逐批保存结果与进度")]
+    SAVE --> R["分层 Reduce<br/>合并与去重"]
+    R --> O["结构化概述条目<br/>稳定 unit_key"]
+    O --> N["本次概述从 1 连续编号"]
+    O --> REF["条目到原始 chunk 的引用链"]
+    SAVE --> PART["部分结果可展示<br/>继续时仅补未完成批次"]
+    PART --> M
+    O --> CACHE[("版本化缓存<br/>文档 · 问题 · 模型配置 · 契约版本")]
+```
+
+旧回答保持原样。每次概述单独编号，内部条目 ID 与显示编号分开；完成批次可复用。处理进度表示原文块覆盖情况，概述是否准确、完整仍需抽检。
+
+### 历史保存完整，模型输入按需选择
+
+```mermaid
+flowchart TB
+    T["每轮完整问题、回答、引用与范围快照"] --> STORE[("SQLite 持久化")]
+    STORE --> REC["近期完整轮次"]
+    STORE --> SUM["滚动摘要"]
+    STORE --> FOCUS["结构化焦点<br/>用户纠正 · 最近实质回答"]
+    STORE --> TASK["历史比较任务索引<br/>任务 ID · 两篇文档及版本 · 维度"]
+    REC --> SELECT["按当前意图选择历史信息"]
+    SUM --> SELECT
+    FOCUS --> SELECT
+    TASK --> SELECT
+    SELECT --> LOC["定位本轮对象"]
+    LOC --> RAW["读取当前版本原文证据"]
+    RAW --> BUILD["ContextBuilder<br/>保留问题与必要证据，裁剪旧轮次"]
+    SELECT --> BUILD
+    BUILD --> MODEL["本轮模型输入"]
+```
+
+历史摘要帮助理解追问，文档主张引用原始证据。已回答的比较任务仍可定位；`pending` 只表示尚有缺口。无效历史 ID 先拒绝，再尝试用可信任务索引恢复；无法唯一匹配时给出具体澄清。
+
+## 4. 快速启动
+
+要求 Python 3.10+，推荐 3.12。页面、API 和静态资源均由本项目独立提供。
+
+### 本地运行
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[ocr,vector,reranker]"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m pip install -e .
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+python -m uvicorn app.main:app --host 127.0.0.1 --port 18000
 ```
 
-打开 http://127.0.0.1:8000/ 使用文档工作台；http://127.0.0.1:8000/docs 为开发者接口文档。默认配置是 BM25 与 Mock，无需模型密钥；Mock 返回证据原文，不代表生成式问答质量。
+打开 [知识工作台](http://127.0.0.1:18000/)；[接口文档](http://127.0.0.1:18000/docs)由服务运行时生成。
 
-## 配置真实 LLM
+默认问答使用 BM25 与 Mock，可先上传 [公开示例](examples/public-demo.md) 验证流程。扫描文档需安装 OCR 扩展并准备模型；仅使用文本资料时可在 `.env` 设置 `STUDYFLOW_OCR_ENABLED=false`。
 
-在 .env 中设置以下字段；聊天模型与 Embedding 模型分别配置。
+### Docker Compose
+
+先启动 Docker Desktop。在项目根目录执行：
+
+```powershell
+if (!(Test-Path .env.docker)) { Copy-Item .env.docker.example .env.docker }
+$env:RAG_PORT = "18000"
+docker compose --env-file .env.docker up --build -d --wait
+docker compose --env-file .env.docker ps
+```
+
+容器将服务的 8000 端口映射到本机 18000；默认不设置 `RAG_PORT` 时映射到 8000。请选用一个未占用的本机端口。
+
+- 数据持久化到独立 `rag_data` 卷，包含 SQLite、上传文件与本地模型。
+- 默认容器演示使用 Mock，OCR、向量和重排关闭；修改配置后重新执行 `up -d`。
+- 查看日志：`docker compose logs --tail 100 api`；停止：`docker compose down`。
+- 向量模式在填好 Embedding 配置后使用 `docker compose --env-file .env.docker --profile vector up -d`，并启用向量检索。
+
+### 真实模型与可选组件
+
+在 `.env`（本地）或 `.env.docker`（容器）中填写兼容接口：
 
 ```dotenv
 STUDYFLOW_LLM_MODE=langchain_openai
-STUDYFLOW_LLM_BASE_URL=你的兼容接口地址，通常以/v1结尾
-STUDYFLOW_LLM_MODEL=你的聊天模型名
-STUDYFLOW_LLM_API_KEY=仅在本地填写
+STUDYFLOW_LLM_BASE_URL=https://your-provider.example/v1
+STUDYFLOW_LLM_MODEL=your-chat-model
+STUDYFLOW_LLM_API_KEY=fill-locally
+STUDYFLOW_LLM_ANSWER_FORMAT=json
+STUDYFLOW_LLM_MAX_OUTPUT_TOKENS=2048
 STUDYFLOW_LLM_TIMEOUT_SECONDS=60
 STUDYFLOW_LLM_MAX_RETRIES=2
-STUDYFLOW_LLM_MAX_OUTPUT_TOKENS=1024
-STUDYFLOW_LLM_ANSWER_FORMAT=text
 ```
 
-- langchain_openai 使用 ChatOpenAI；openai_compatible 使用直接 HTTP。两者共用调用限制、重试与答案校验。
-- 仅网络异常、超时、408、429、5xx 重试；鉴权和响应格式错误立即失败。最多尝试 max_retries + 1 次，限时按每次请求计算。
-- temperature 默认为空，不发送该参数；需要时在配置中显式填写。
-- text 保持既有自由文本契约。上游支持 JSON object 时可切换 json，返回明确的 answered / insufficient_evidence 状态，拒答由服务归一为固定文案。
-- JSON 格式不合法、引用声明与正文不一致时明确标记 invalid_response；不会把失败伪装为成功。
-- 调用错误返回 502 / 503 / 504，并提供 run_id。运行记录包含尝试次数、耗时、实际 token 用量和脱敏错误类别。
-- 当前 /chat 返回完整 JSON。
-
-## 检索、OCR 与重排
-
-检索策略：lexical_v1、lexical_v2、bm25_v1、bm25_idf_v2、dense_v1、hybrid_rrf_v1。默认 bm25_idf_v2；向量模式需要独立 Qdrant 和 Embedding 配置。
+增强问答需模型遵循结构化答案契约，建议使用支持 JSON object 的接口。聊天与 Embedding 配置独立；配置模板列在 [.env.example](.env.example) 与 [.env.docker.example](.env.docker.example)。
 
 ```powershell
+python -m pip install -e ".[ocr,vector,reranker]"
 python -m app.rag.ocr --prepare
 python -m app.rag.reranker --prepare
 ```
 
-模型必须显式准备，请求期间不自动下载。重排默认关闭，ONNX INT8 AVX2 模型需要兼容 CPU。详细配置见 .env.example。
+模型准备完成后再启用相应开关；请求期间不自动下载模型。容器内可用 `docker compose run --rm api python -m app.rag.ocr --prepare` 准备持久卷中的 OCR 模型，重排同理。
 
-## 文档与问答 API
+检索策略可选 `lexical_v1`、`lexical_v2`、`bm25_v1`、`bm25_idf_v2`、`dense_v1` 和 `hybrid_rrf_v1`，默认 `bm25_idf_v2`。Dense/Hybrid 需要 Qdrant 与 Embedding；ONNX 重排默认关闭。
+
+## 5. 使用与接口
+
+1. 新建会话，上传资料，等待摄取状态变为就绪。
+2. 选择本轮文档范围和回答策略，提出事实问题、概述或比较问题。
+3. 点击引用，对照文件、页码和原文；通过运行详情检查检索与调用过程。
+4. 从左侧历史恢复会话；归档可恢复，当前不提供会话删除。
+
+`document_strict` 仅依据文档回答；`document_enhanced` 可单独补充模型通用知识。新工作台会话默认增强模式，旧 API 未指定策略仍兼容严格模式。全文概述始终按文档取证。
 
 | 方法 | 路径 | 用途 |
 |---|---|---|
-| POST | /documents/upload | 上传并解析、切块、索引 |
-| GET | /documents | 列出文档 |
-| GET | /documents/{id}/pages | 查看页级原文和 OCR 元数据 |
-| GET | /documents/{id}/source | 下载原文件 |
-| POST | /documents/{id}/reindex | 对保存文本重新切块并索引，不重新 OCR |
-| POST | /documents/{id}/reparse | 从原文件重新解析/OCR 并更新索引 |
-| DELETE | /documents/{id} | 删除文档及索引 |
-| POST | /chat | 指定文档范围或查询全库 |
-| GET | /runs/{id} | 查询成功或失败运行的诊断 |
-| GET | /health | 进程健康检查，不调用付费模型 |
+| POST / GET | `/conversations` | 新建会话、分页查询历史 |
+| GET | `/conversations/{id}` | 恢复会话状态 |
+| GET | `/conversations/{id}/turns` | 分页读取轮次 |
+| PATCH | `/conversations/{id}` | 修改标题或归档/恢复（title、archived） |
+| PATCH | `/conversations/{id}/policy` | 切换后续轮次的回答策略 |
+| POST / GET | `/ingestions`、`/ingestions/{id}` | 受理上传任务、查询进度 |
+| POST | `/documents/upload` | 兼容同步上传接口 |
+| GET | `/documents`、`/documents/{id}/pages` | 查看文档及页级原文 |
+| GET | `/documents/{id}/chunks/{chunk_id}`、`/source` | 核验 chunk、下载原文件 |
+| POST | `/documents/{id}/reindex`、`/reparse` | 重新切块索引、从原文件重新解析 |
+| POST | `/chat` | 带 session_id、范围和策略提问 |
+| GET | `/runs/{id}`、`/health` | 诊断记录、进程健康检查 |
 
-reparse 保留 document ID，但 chunk ID 可能改变；历史问答保留原快照。SQLite 更新使用事务，向量同步失败时标记 failed，可通过 reindex 重试，不宣称跨存储原子事务。
+`/chat` 返回完整 JSON。调用失败返回对应错误状态和 `run_id`；运行记录保存尝试次数、各阶段耗时、实际 Token 和脱敏异常。上游未返回 Token 时记录为 `null`，预算估算另行标记。
 
-## 验证与评测
+## 6. 测试与评测口径
+
+### 离线回归与服务冒烟
 
 ```powershell
 python -m unittest discover -s tests -v
-python scripts/smoke_api.py
-# 启动真实 LLM 服务后，显式执行真实调用并保存结果。
-python scripts/smoke_api.py --real-llm --output evaluation/results/public-llm-smoke.json
+$env:KF_STATIC_DIR = (Resolve-Path .\app\static).Path
+node tests/frontend_answer_tests.js
+node tests/frontend_upload_tests.js
+python scripts/smoke_api.py --base-url http://127.0.0.1:18000
 ```
 
-smoke 使用公开合成资料，验证上传、来源、回答/拒答、运行记录和删除；其机械检查不替代人工语义验收。模块测试使用模拟模型，不访问外网。
+模块回归使用模拟模型与公开合成夹具，覆盖历史定位、跨话题比较、范围/版本变化、方面证据覆盖、部分概述续处理、预算超限及答案修复。服务冒烟使用公开资料验证上传、来源、回答/拒答与运行记录。
 
-历史开发集包含 35 题检索查询与 40 题答案案例。列表切块修正后，35 题开发集 BM25 IDF² Recall@4 为 0.9714 → 1.0000，MRR@4 为 0.9238 → 0.9310。
-
-
-## Docker 与公开发布
-
-Docker 启动、持久卷、Qdrant 配置和模型准备见 [部署说明](docs/deployment.md)。
-GitHub 使用白名单导出目录，步骤见 [发布说明](docs/release-checklist.md)。
+真实模型测试需显式执行，会使用本地配置的模型服务：
 
 ```powershell
-docker compose up --build -d
-python scripts/smoke_api.py
+python -m evaluation.task_memory_benchmark --output evaluation/results/task-memory-new
+python -m evaluation.benchmark_review --report evaluation/results/task-memory-new/report.json --output evaluation/results/task-memory-new/review-template.json
 ```
 
-默认容器演示关闭 OCR、向量和真实 LLM；按部署说明显式配置后启用。运行数据保存在独立卷，不覆盖本地 .studyflow。
+任务完成需所有预定步骤满足答案、引用、范围和拒答要求；同时保存机械检查与逐项语义评审。Token 实验对同一问题、同一证据分别携带完整历史和压缩历史，单独统计摘要开销。
 
-## 文档工作台
+### 已有结果
 
-根路径 / 提供本地中文工作台，页面资源随 Python 安装包和 Docker 镜像分发，不依赖 CDN 或前端构建服务。
+| 项目 | 固定测试条件 | 结果 |
+|---|---|---|
+| 检索召回优化 | 23 份文档、35 题开发查询；同一问题与证据标注、BM25 IDF²、原始 Top-4；修正列表切块 | 证据级宏平均 Recall@4：97.14% → 100%，提升 **2.86 个百分点**；MRR@4：0.9238 → 0.9310 |
+| 答案案例 | 历史答案评测集 | 40 个案例；案例数量单独记录 |
+| 合成任务完成 | 4 份公开合成资料、12 块原文、18 个可回答任务；规则检查及助手语义复核 | **18/18**；另 2 个缺证据控制任务均正确拒答，共 23 个实际用户轮次 |
+| 回答输入成本 | qwen3.7-plus、JSON、temperature=0、关闭 thinking；16 轮固定历史、8 组同问题同证据配对，摘要＋近期 3 轮对比完整历史 | 输入 17,785 → 10,809 Token，下降 **39.22%** |
+| 计入摘要成本 | 上述 8 组实验，计入一次摘要生成的 1,725 输入 Token | 累计输入 17,785 → 12,534 Token，下降 **29.52%**；含输出总量 18,901 → 13,772，下降 **27.14%** |
+| 模块回归 | 当前源码，模拟模型与合成材料 | **310 项 unittest 通过**，含发布排除规则回归 |
 
-- 知识问答：选择全部或指定文档范围，查看带编号引用的回答与明确拒答状态。
-- 资料库：拖放或选择多份资料上传，搜索文件名，查看解析原文，重新索引、重新解析与删除。
-- 引用来源：独立展示文件、页码、chunk ID 和原文快照，可打开页级文本并下载原文件。
-- 运行记录：查看本浏览器见过的 run_id，或手动查找既有记录，展示调用耗时、实际 token 和失败诊断。
+开发集指标用于调优；合成任务结果经过助手复核，尚非独立人工盲测。Token 数据属于固定历史的配对实验，不能替代所有真实会话的成本统计。两种上下文在该配对实验中的 8 个答案均通过检查。
 
-页面根据服务能力提示是否支持图片识别。回答和文件内容以文本节点呈现，不执行文档中的 HTML 或脚本。工作台的引用编号校验不等于自动语义核验。
+## 7. 仓库结构与发布
 
+```text
+app/                 API、RAG 模块与静态工作台
+tests/               Python 与前端回归
+evaluation/          评测脚本及公开合成夹具
+examples/            可上传的公开示例
+scripts/             服务冒烟与白名单发布工具
+.github/workflows/   CI
+Dockerfile
+compose.yaml
+.env.example
+.env.docker.example
+README.md
+```
 
-## 会话式文档问答（v2）
+公开仓库不包含 `docs/`、真实配置、上传资料、SQLite 数据库、本地模型及运行报告。设计和操作说明集中在本 README。
 
-工作台支持文档概述、连续附件、任务取消/恢复和多轮追问。
-后台摄取阶段分别显示排队、解析/OCR、切块、索引与就绪；客户端停止传输不代表服务端已确认取消。
+发布包通过白名单生成并附带逐文件 SHA-256 清单；只允许在项目自身的 `dist/` 下创建全新目录：
 
-新客户端先POST /conversations，再将返回id作为 /chat 的session_id。POST /ingestions受理后返回202和任务id，使用GET /ingestions/{id}查询；取消与重试使用对应子接口。
-会话范围、消息与附件持久化到本项目SQLite；旧 /documents/upload 与旧问答客户端保留兼容行为。
-概述绕过关键词命中门槛，按原始chunk取证；长文分批汇总，缺失范围明确标记部分回答。引用可通过 /documents/{document_id}/chunks/{chunk_id}核验。
+```powershell
+python scripts/prepare_release.py --name knowledgeflow-rag-public
+```
 
-近期完整轮次、滚动摘要和结构化主题用于理解追问；历史摘要不单独作为事实证据。所有模型阶段统一检查输入预算。
-可配置 STUDYFLOW_CONTEXT_WINDOW、STUDYFLOW_HISTORY_BUDGET、STUDYFLOW_MEMORY_SUMMARY_BUDGET、STUDYFLOW_OVERVIEW_MAX_OUTPUT_TOKENS（默认4096）、STUDYFLOW_OVERVIEW_MAX_CALLS 与 STUDYFLOW_INGESTION_TIMEOUT_SECONDS。
-未知模型采用明确标记的保守计数，不能把估算值当服务商实际token。
-
-运行 python -m evaluation.conversation_validation 记录自动回归；node tests/frontend_upload_tests.js仅为客户端故障单测，不代替真实浏览器验收。
-真实模型合成资料验证：python -m evaluation.conversation_live。语义复核与浏览器检查单独记录，自动通过不表示完整验收。
-完整模块边界与门槛见 [最终设计](docs/conversation-rag-v2-final-design.md)。
-
-
-## 文档增强回答与问题理解（v1）
-
-工作台的新会话默认 `document_enhanced`，可切换为 `document_strict`。旧 API 未指定策略仍按严格文档问答运行。
-
-- **文档概述、论文实验数值、报告要求**始终要求原文。不能用模型知识补造论文结果。
-- **概念、原理、用途、比较和常见局限**可由 LLM 补充；无附件时也可问明确的通用问题。
-- 回答分为文档依据、模型通用知识、范围与缺失说明。模型知识没有文档引用，也没有联网核实。
-- 结构化问题解析保留最近实质回答。拒答和澄清不覆盖主题；多个“第二点”先展示候选，回复标题即可接续。
-- 每轮冻结文档范围和策略。追问读取当前原文 chunk，检查来源版本；模型知识不会升级成文档事实。
-- 通常两次前台逻辑调用，最多三次，只允许一次补检索。第3次也可用于首次结构不合规后的重新生成，不能与补检索循环叠加。增强总期限默认120秒，解析20秒；长文概述使用原有独立期限。
-
-新接口：`POST /conversations` 可指定 `{"answer_policy":"document_enhanced"}`；
-`PATCH /conversations/{id}/policy` 切换后续轮次模式。`POST /chat` 也可显式覆盖本轮策略。
-返回字段包括 `answer_policy`、`effective_policy`、`answer_basis`、`answer_sections`、`unresolved_aspects`。
-`answer_basis` 为 `document_only`、`document_and_model`、`model_only` 或 `none`，由服务端校验后计算。
-概述即使选择增强模式，其 `effective_policy` 仍为严格文档模式。
-
-上游支持 JSON object 时建议 `STUDYFLOW_LLM_ANSWER_FORMAT=json`。可选 `STUDYFLOW_LLM_ENABLE_THINKING` 只用于支持该扩展的服务商，留空不发送；第三方代理是否透传必须实测。
-Qwen 的该参数语义见 [模型服务文档](https://www.alibabacloud.com/help/en/model-studio/deep-thinking)。
-本模块不自动开启 Dense、Qdrant、联网搜索，也不解决既有长概述超时。
-
-自动回归：`python -m evaluation.enhanced_validation --all`；
-公开合成真实模型开发集：`python -m evaluation.enhanced_live --data evaluation/document-enhanced-v1 --partition development`。
-后者会调用当前配置的真实模型，建议使用隔离配置和临时数据目录。开发集、冻结验收集、逐事实语义复核和浏览器点击验收分别记录。
-模块设计及验收门槛见 [文档增强问答设计](docs/document-enhanced-rag-v1-design.md)。
+项目独立管理配置、数据和启动流程。原生页面随 Python 包与镜像分发，无需 Node 构建；Node 仅用于前端单测。

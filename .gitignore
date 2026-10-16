@@ -18,3 +18,5 @@ Test_RagFile/
 evaluation/results/
 request.json
 response.json
+# 设计说明集中在公开 README；本地 docs 归档不随源码上传。
+/docs/
